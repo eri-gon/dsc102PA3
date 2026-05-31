@@ -426,7 +426,7 @@ def task_7(data_io, train_data, test_data):
     
     # ---------------------- Put results in res dict --------------------------
     res = {
-        'test_rmse': None
+        'test_rmse': float(test_rmse)
     }
     # Modify res:
 
@@ -476,11 +476,11 @@ def task_8(data_io, train_data, test_data):
     
     # ---------------------- Put results in res dict --------------------------
     res = {
-        'test_rmse': None,
-        'valid_rmse_depth_5': None,
-        'valid_rmse_depth_7': None,
-        'valid_rmse_depth_9': None,
-        'valid_rmse_depth_12': None,
+        'test_rmse': test_rmse,
+        'valid_rmse_depth_5': valid_rmses[5],
+        'valid_rmse_depth_7': valid_rmses[7],
+        'valid_rmse_depth_9': valid_rmses[9],
+        'valid_rmse_depth_12': valid_rmses[12],
     }
     # Modify res:
 
