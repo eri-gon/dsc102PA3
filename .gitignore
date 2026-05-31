@@ -1,5 +1,6 @@
 # misc
 .ipynb_checkpoints/
+__pycache__/
 
 # local
 assignment2_starter.*
