@@ -4,6 +4,7 @@ import pyspark.sql.types as T
 from utilities import SEED
 # import any other dependencies you want, but make sure only to use the ones
 # availiable on AWS EMR
+from pyspark import StorageLevel
 
 # ---------------- choose input format, dataframe or rdd ----------------------
 INPUT_FORMAT = 'dataframe'  # change to 'rdd' if you wish to use rdd inputs
