@@ -1,0 +1,5 @@
+.ipynb_checkpoints/
+
+log4j-spark.properties
+pa2_main.py
+utilities.py
