@@ -1,5 +1,8 @@
+# misc
 .ipynb_checkpoints/
 
+# local
+assignment2_starter.*
 log4j-spark.properties
 pa2_main.py
 utilities.py
