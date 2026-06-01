@@ -53,9 +53,10 @@ def task_1(data_io, review_data, product_data):
         F.count("overall").alias("countRating")
     )
 
-    joined_df = product_data.join(agg_reviews, on="asin", how="left").persist(StorageLevel.MEMORY_AND_DISK)
+    joined_df = product_data.join(agg_reviews, on="asin", how="left")
 
     stats = joined_df.select(
+        F.count("*"),  # add this as first element
         F.avg("meanRating"), 
         F.variance("meanRating"), 
         F.sum(F.col("meanRating").isNull().cast("int")),
@@ -63,10 +64,6 @@ def task_1(data_io, review_data, product_data):
         F.variance("countRating"), 
         F.sum(F.col("countRating").isNull().cast("int"))
     ).collect()[0]
-
-    count_total = joined_df.count()
-
-    joined_df.unpersist()
 
     # -------------------------------------------------------------------------
 
@@ -76,13 +73,13 @@ def task_1(data_io, review_data, product_data):
     # different inputs.
     # Modify the values of the following dictionary accordingly.
     res = {
-        'count_total': count_total,
-        'mean_meanRating': stats[0],
-        'variance_meanRating': stats[1],
-        'numNulls_meanRating': stats[2],
-        'mean_countRating': stats[3],
-        'variance_countRating': stats[4],
-        'numNulls_countRating': stats[5]
+        'count_total': stats[0],
+        'mean_meanRating': stats[1],
+        'variance_meanRating': stats[2],
+        'numNulls_meanRating': stats[3],
+        'mean_countRating': stats[4],
+        'variance_countRating': stats[5],
+        'numNulls_countRating': stats[6]
     }
     # Modify res:
 
@@ -176,27 +173,35 @@ def task_3(data_io, product_data):
 
     # ---------------------- Your implementation begins------------------------
 
-    df_with_count = product_data.withColumn(
-        "countAlsoViewed",
-        F.when(
-            F.col("related.also_viewed").isNotNull() & (F.size(F.col("related.also_viewed")) > 0),
-            F.size(F.col("related.also_viewed"))
-        ).otherwise(None)
+    prices_lookup = product_data.select(
+        F.col("asin").alias("viewed_asin"), 
+        F.col("price").alias("viewed_price")
     )
-    
-    # Explode array to cross-reference product pricing
-    exploded_df = product_data.select("asin", F.explode("related.also_viewed").alias("viewed_asin"))
-    prices_lookup = product_data.select(F.col("asin").alias("viewed_asin"), F.col("price").alias("viewed_price"))
-    
+
+    exploded_df = product_data.select(
+        "asin",
+        F.explode("related.also_viewed").alias("viewed_asin")
+    )
+
     joined_prices = exploded_df.join(prices_lookup, on="viewed_asin", how="inner")\
                                .filter(F.col("viewed_price").isNotNull())
-    
-    mean_prices_df = joined_prices.groupBy("asin").agg(F.avg("viewed_price").alias("meanPriceAlsoViewed"))
-    
-    final_df = df_with_count.join(mean_prices_df, on="asin", how="left").persist(StorageLevel.MEMORY_AND_DISK)
-    
-    count_total = final_df.count()
+
+    mean_prices_df = joined_prices.groupBy("asin").agg(
+        F.avg("viewed_price").alias("meanPriceAlsoViewed")
+    )
+
+    count_df = product_data.select(
+        "asin",
+        F.when(
+            F.col("related.also_viewed").isNotNull() & (F.size("related.also_viewed") > 0),
+            F.size("related.also_viewed")
+        ).alias("countAlsoViewed")
+    )
+
+    final_df = count_df.join(mean_prices_df, on="asin", how="left").persist(StorageLevel.MEMORY_AND_DISK)
+
     stats = final_df.select(
+        F.count("*"),
         F.avg("meanPriceAlsoViewed"),
         F.variance("meanPriceAlsoViewed"),
         F.sum(F.col("meanPriceAlsoViewed").isNull().cast("int")),
@@ -204,20 +209,20 @@ def task_3(data_io, product_data):
         F.variance("countAlsoViewed"),
         F.sum(F.col("countAlsoViewed").isNull().cast("int"))
     ).collect()[0]
-    
+
     final_df.unpersist()
 
     # -------------------------------------------------------------------------
 
     # ---------------------- Put results in res dict --------------------------
     res = {
-        'count_total': count_total,
-        'mean_meanPriceAlsoViewed': stats[0],
-        'variance_meanPriceAlsoViewed': stats[1],
-        'numNulls_meanPriceAlsoViewed': stats[2],
-        'mean_countAlsoViewed': stats[3],
-        'variance_countAlsoViewed': stats[4],
-        'numNulls_countAlsoViewed': stats[5]
+        'count_total': stats[0],
+        'mean_meanPriceAlsoViewed': stats[1],
+        'variance_meanPriceAlsoViewed': stats[2],
+        'numNulls_meanPriceAlsoViewed': stats[3],
+        'mean_countAlsoViewed': stats[4],
+        'variance_countAlsoViewed': stats[5],
+        'numNulls_countAlsoViewed': stats[6]
     }
     # Modify res:
 
@@ -317,7 +322,7 @@ def task_5(data_io, product_processed_data, word_0, word_1, word_2):
     tokenized_df = product_processed_data.withColumn(
         "titleArray", 
         F.split(F.lower(F.col("title")), " ")
-    )
+    ).persist(StorageLevel.MEMORY_AND_DISK)
     
     word2Vec = (M.feature.Word2Vec()
                 .setVectorSize(16)
@@ -328,18 +333,18 @@ def task_5(data_io, product_processed_data, word_0, word_1, word_2):
                 .setOutputCol(titleVector_column))
     
     model = word2Vec.fit(tokenized_df)
-    transformed_df = model.transform(tokenized_df)
 
     # -------------------------------------------------------------------------
 
     # ---------------------- Put results in res dict --------------------------
     res = {
-        'count_total': transformed_df.count(),
+        'count_total': tokenized_df.count(),
         'size_vocabulary': model.getVectors().count(),
         'word_0_synonyms': [(row[0], float(row[1])) for row in model.findSynonyms(word_0, 10).collect()],
         'word_1_synonyms': [(row[0], float(row[1])) for row in model.findSynonyms(word_1, 10).collect()],
         'word_2_synonyms': [(row[0], float(row[1])) for row in model.findSynonyms(word_2, 10).collect()]
     }
+    tokenized_df.unpersist()
     # Modify res:
 
 
@@ -444,6 +449,8 @@ def task_8(data_io, train_data, test_data):
     # ---------------------- Your implementation begins------------------------
     
     train_split, valid_split = train_data.randomSplit([0.75, 0.25], seed=SEED)
+    train_split = train_split.persist(StorageLevel.MEMORY_AND_DISK)
+    valid_split = valid_split.persist(StorageLevel.MEMORY_AND_DISK)
     
     evaluator = M.evaluation.RegressionEvaluator(
         labelCol="overall",
